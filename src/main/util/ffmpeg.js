@@ -2,63 +2,57 @@ import ffmpeg from 'fluent-ffmpeg'
 import path from 'path'
 import log from '../logger.js'
 
-function initFFmpeg() {
-  const ffmpegPath = {
-    'development-win32': path.join(__dirname, '../../resources/ffmpeg/win-amd64/bin/ffmpeg.exe'),
-    'development-linux': path.join(__dirname, '../../resources/ffmpeg/linux-amd64/ffmpeg'),
-    'production-win32': path.join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'resources',
-      'ffmpeg',
-      'win-amd64',
-      'bin',
-      'ffmpeg.exe'
-    ),
-    'production-linux': path.join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'resources',
-      'ffmpeg',
-      'linux-amd64',
-      'ffmpeg'
-    )
-  }
+import fs from 'fs'
 
-  if(process.env.NODE_ENV === undefined){
+function findBinary(name) {
+  const commonPaths = [
+    `/opt/homebrew/bin/${name}`,
+    `/usr/local/bin/${name}`,
+    `/usr/bin/${name}`
+  ]
+  for (const p of commonPaths) {
+    if (fs.existsSync(p)) return p
+  }
+  return name
+}
+
+function initFFmpeg() {
+  if (process.env.NODE_ENV === undefined) {
     process.env.NODE_ENV = 'production'
   }
 
-  const ffmpegPathValue = ffmpegPath[`${process.env.NODE_ENV}-${process.platform}`]
-  log.debug('ENV:', `${process.env.NODE_ENV}-${process.platform}`)
-  log.info('FFmpeg path:', ffmpegPathValue)
-  ffmpeg.setFfmpegPath(ffmpegPathValue)
+  let ffmpegPathValue
+  let ffprobePathValue
 
-  const ffprobePath = {
-    'development-win32': path.join(__dirname, '../../resources/ffmpeg/win-amd64/bin/ffprobe.exe'),
-    'development-linux': path.join(__dirname, '../../resources/ffmpeg/linux-amd64/ffprobe'),
-    'production-win32': path.join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'resources',
-      'ffmpeg',
-      'win-amd64',
-      'bin',
-      'ffprobe.exe'
-    ),
-    'production-linux': path.join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'resources',
-      'ffmpeg',
-      'linux-amd64',
-      'ffprobe'
-    )
+  if (process.platform === 'darwin') {
+    ffmpegPathValue = findBinary('ffmpeg')
+    ffprobePathValue = findBinary('ffprobe')
+  } else if (process.platform === 'win32') {
+    ffmpegPathValue = process.env.NODE_ENV === 'development'
+      ? path.join(__dirname, '../../resources/ffmpeg/win-amd64/bin/ffmpeg.exe')
+      : path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'ffmpeg', 'win-amd64', 'bin', 'ffmpeg.exe')
+    ffprobePathValue = process.env.NODE_ENV === 'development'
+      ? path.join(__dirname, '../../resources/ffmpeg/win-amd64/bin/ffprobe.exe')
+      : path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'ffmpeg', 'win-amd64', 'bin', 'ffprobe.exe')
+  } else {
+    ffmpegPathValue = process.env.NODE_ENV === 'development'
+      ? path.join(__dirname, '../../resources/ffmpeg/linux-amd64/ffmpeg')
+      : path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'ffmpeg', 'linux-amd64', 'ffmpeg')
+    ffprobePathValue = process.env.NODE_ENV === 'development'
+      ? path.join(__dirname, '../../resources/ffmpeg/linux-amd64/ffprobe')
+      : path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'ffmpeg', 'linux-amd64', 'ffprobe')
   }
 
-  const ffprobePathValue = ffprobePath[`${process.env.NODE_ENV}-${process.platform}`]
+  log.debug('ENV:', `${process.env.NODE_ENV}-${process.platform}`)
+  log.info('FFmpeg path:', ffmpegPathValue)
+  if (ffmpegPathValue) {
+    ffmpeg.setFfmpegPath(ffmpegPathValue)
+  }
+
   log.info('FFprobe path:', ffprobePathValue)
-  ffmpeg.setFfprobePath(ffprobePathValue)
+  if (ffprobePathValue) {
+    ffmpeg.setFfprobePath(ffprobePathValue)
+  }
 }
 
 initFFmpeg()
